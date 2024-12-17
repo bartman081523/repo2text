@@ -342,7 +342,6 @@ def main():
             output_file.write("\n\nFile Content Begin -->\n")
             write_file_contents_in_order(args.repo_path, output_file, args)
             output_file.write("\n<-- File Content Ends\n\n")
-            output_file.write("\nInstruction: Okay Echo, now you know the code. Please give me a function overview of the code, with headers and subheaders, in Markdown format. And in the following conversation, you stick to that main function overview, so long as it is feasible.\n\n")
 
 if __name__ == "__main__":
     main()
