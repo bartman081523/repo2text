@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import os
 import argparse
 import json
@@ -8,20 +6,8 @@ from docx.shared import Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
 def load_config(file_path):
-    """
-    Load configuration from a JSON file.
-
-    Args:
-        file_path (str): The path to the JSON configuration file.
-
-    Returns:
-        dict: A dictionary containing the configuration settings.
-    """
     with open(file_path, 'r') as file:
         return json.load(file)
-
-# Usage
-import os
 
 config_path = os.path.join(os.path.dirname(__file__), 'config.json')
 config = load_config(config_path)
@@ -35,13 +21,6 @@ ADDITIONAL_IGNORE_TYPES = config["additional_ignore_types"]
 DEFAULT_OUTPUT_FILE = config["default_output_file"]
 
 def parse_args():
-    """
-    Parse command-line arguments for the script.
-
-    Returns:
-        argparse.Namespace: An object containing the parsed command-line arguments.
-    """
-
     parser = argparse.ArgumentParser(
         description='Document the structure of a GitHub repository.',
         epilog=('Example usage:\n'
@@ -56,11 +35,11 @@ def parse_args():
     )
 
     parser.add_argument('-r', '--repo_path', default=os.getcwd(),
-                        help='Path to the directory to process (ie., cloned repo). if no path is specified defaults to the current directory.')
+                        help='Path to the directory to process (i.e., cloned repo). If no path is specified, defaults to the current directory.')
     parser.add_argument('-o', '--output_file', default=DEFAULT_OUTPUT_FILE,
                         help='Name for the output text file. Defaults to "output.txt".')
     parser.add_argument('--ignore-files', nargs='*', default=[],
-                        help='List of file names to ignore. Omit this argument to ignore no file names.')
+                        help='List of file paths (relative to repo_path) to ignore. Omit this argument to ignore no file names.') # Changed help message
     parser.add_argument('--ignore-types', nargs='*', default=IMAGE_EXTENSIONS + VIDEO_EXTENSIONS + AUDIO_EXTENSIONS + DOCUMENT_EXTENSIONS + EXECUTABLE_EXTENSIONS,
                         help='List of file extensions to ignore. Defaults to list in config.json. Omit this argument to ignore no types.')
     parser.add_argument('--exclude-dir', nargs='*', default=[],
@@ -74,57 +53,40 @@ def parse_args():
 
 
 def should_ignore(item, args, output_file_path):
-
-    """
-    Determine if a given item should be ignored based on the script's arguments.
-
-    Args:
-        item (str): The path of the item (file or directory) to check.
-        args (argparse.Namespace): Parsed command-line arguments.
-        output_file_path (str): The path of the output file being written to.
-
-    Returns:
-        bool: True if the item should be ignored, False otherwise.
-    """
-
     item_name = os.path.basename(item)
     file_ext = os.path.splitext(item_name)[1].lower()
 
-    # Ensure the comparison is between path strings
     if os.path.abspath(item) == os.path.abspath(output_file_path):
         return True
 
-    # Adjust logic to handle hidden files and directories correctly
     if item_name.startswith('.'):
-        return True  # Ignore all hidden files and directories
-
-    if os.path.isdir(item) and args.exclude_dir and item_name in args.exclude_dir:
         return True
+
+    # Use os.path.relpath to get a consistent relative path for comparison
+    if args.repo_path:
+        rel_path = os.path.relpath(item, start=args.repo_path)
+    else:
+         rel_path = item #If repo_path is not provided, use the item
+
+    if os.path.isdir(item) and args.exclude_dir:
+            if item_name in args.exclude_dir:  # Check directory name
+                return True
 
     if args.include_dir and not os.path.abspath(item).startswith(os.path.abspath(args.include_dir)):
         return True
 
-    if os.path.isfile(item) and (item_name in args.ignore_files or file_ext in args.ignore_types):
-        return True
-
+     # Correctly check if the *relative path* is in ignore_files
+    if os.path.isfile(item) and args.ignore_files:
+        if rel_path in args.ignore_files:  # Check full relative path
+            return True
+    if os.path.isfile(item) and file_ext in args.ignore_types:
+            return True
     if args.ignore_settings and file_ext in SETTINGS_EXTENSIONS:
         return True
 
     return False
 
 def write_tree(dir_path, output_file, args, prefix="", is_last=True, is_root=True):
-    """
-    Recursively write the directory tree to the output file, including the root directory name.
-
-    Args:
-        dir_path (str): The path of the directory to document.
-        output_file (file object): The file object to write to.
-        args (argparse.Namespace): Parsed command-line arguments.
-        prefix (str): Prefix string for line indentation and structure. Defaults to "".
-        is_last (bool): Flag to indicate if the item is the last in its level. Defaults to True.
-        is_root (bool): Flag to indicate if the current directory is the root. Defaults to True.
-    """
-
     if is_root:
         output_file.write(f"{os.path.basename(dir_path)}/\n")
         is_root = False
@@ -151,14 +113,6 @@ def write_tree(dir_path, output_file, args, prefix="", is_last=True, is_root=Tru
 
 
 def write_file_content(file_path, output_file, depth):
-    """
-    Write the contents of a given file to the output file with proper indentation.
-
-    Args:
-        file_path (str): Path of the file to read.
-        output_file (file object): The file object to write the contents to.
-        depth (int): Current depth in the directory tree for indentation.
-    """
     indentation = ''
     if file_path.endswith('.csv'):
         output_file.write(f"{indentation}[Contenido del archivo CSV omitido]\n")
@@ -172,18 +126,6 @@ def write_file_content(file_path, output_file, depth):
 
 
 def write_tree_docx(dir_path, doc, args, output_file_path, prefix="", is_last=True, is_root=True):
-    """
-    Recursively create a document structure of the directory tree in a DOCX file, including the root directory name.
-
-    Args:
-        dir_path (str): The path of the directory to document.
-        doc (Document): The DOCX document object to write to.
-        args (argparse.Namespace): Parsed command-line arguments.
-        output_file_path (str): The path of the output DOCX file being written to.
-        prefix (str): Prefix string for line indentation and structure. Defaults to "".
-        is_last (bool): Flag to indicate if the item is the last in its level. Defaults to True.
-        is_root (bool): Flag to indicate if the current directory is the root. Defaults to True.
-    """
 
     if is_root:
         root_paragraph = doc.add_paragraph()
@@ -214,18 +156,6 @@ def write_tree_docx(dir_path, doc, args, output_file_path, prefix="", is_last=Tr
 
 
 def write_file_content_docx(file_path, doc):
-
-    """
-    Write the contents of a given file to a DOCX document.
-
-    Args:
-        file_path (str): Path of the file to read.
-        doc (Document): The DOCX document object to write the contents to.
-
-    This function reads the contents of 'file_path' and writes them to 'doc'.
-    If an error occurs during reading, it adds an error message to 'doc'.
-    """
-
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
             contents = file.read()
@@ -238,15 +168,6 @@ def write_file_content_docx(file_path, doc):
 
 
 def write_file_contents_in_order(dir_path, output_file, args, depth=0):
-    """
-    Recursively document the contents of files in the order they appear in the directory tree.
-
-    Args:
-        dir_path (str): The path of the directory to start documenting from.
-        output_file (file object): The file object to write the contents to.
-        args (argparse.Namespace): Parsed command-line arguments.
-        depth (int): Current depth in the directory tree. Defaults to 0.
-    """
     items = sorted(item for item in os.listdir(dir_path) if not should_ignore(os.path.join(dir_path, item), args, args.output_file))
 
     for item in items:
@@ -262,15 +183,7 @@ def write_file_contents_in_order(dir_path, output_file, args, depth=0):
 
 
 def write_file_contents_in_order_docx(dir_path, doc, args, depth=0):
-    """
-    Recursively document the contents of files in a DOCX document in the order they appear in the directory tree.
 
-    Args:
-        dir_path (str): The path of the directory to start documenting from.
-        doc (Document): The DOCX document object to write the contents to.
-        args (argparse.Namespace): Parsed command-line arguments.
-        depth (int): Current depth in the directory tree. Defaults to 0.
-    """
     items = sorted(item for item in os.listdir(dir_path) if not should_ignore(os.path.join(dir_path, item), args, args.output_file))
 
     for item in items:
@@ -305,15 +218,15 @@ def main():
         doc = Document()
         doc.styles['Normal'].font.name = 'Arial'
         doc.styles['Normal'].font.size = Pt(11)
-        
+
         doc.add_heading("Repository Documentation", level=1)
         doc.add_paragraph(
-        "This document provides a comprehensive overview of the repository's structure and contents."
-        "The first section, titled 'Directory/File Tree', displays the repository's hierarchy in a tree format."
-        "In this section, directories and files are listed using tree branches to indicate their structure and relationships."
-        "Following the tree representation, the 'File Content' section details the contents of each file in the repository."
-        "Each file's content is introduced with a '[File Begins]' marker followed by the file's relative path,"
-        "and the content is displayed verbatim. The end of each file's content is marked with a '[File Ends]' marker."
+        "This document provides a comprehensive overview of the repository's structure and contents.\n"
+        "The first section, titled 'Directory/File Tree', displays the repository's hierarchy in a tree format.\n"
+        "In this section, directories and files are listed using tree branches to indicate their structure and relationships.\n"
+        "Following the tree representation, the 'File Content' section details the contents of each file in the repository.\n"
+        "Each file's content is introduced with a '[File Begins]' marker followed by the file's relative path,\n"
+        "and the content is displayed verbatim. The end of each file's content is marked with a '[File Ends]' marker.\n"
         "This format ensures a clear and orderly presentation of both the structure and the detailed contents of the repository.\n\n"
         )
         doc.add_heading("Directory/File Tree Begins -->", level=2)

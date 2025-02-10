@@ -5,6 +5,6 @@
     "document_extensions": [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".jar", ".zip", ".tar", ".gzip", ".csv"],
     "executable_extensions": [".exe", ".dll", ".bin"],
     "settings_extensions": [],
-    "additional_ignore_types": [".lock", ".npy", ".pyc", ".model", ".lockb", ".json", ".db"],
+    "additional_ignore_types": [".lock", ".npy", ".pyc", ".model", ".lockb", ".db", ".st", ".tsv", ".bin", ".pkl", ".txt", ".bz2"],
     "default_output_file": "repo.txt"
 }
